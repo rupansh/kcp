@@ -33,11 +33,11 @@ const IUINT32 IKCP_CMD_WINS = 84;		// cmd: window size (tell)
 const IUINT32 IKCP_ASK_SEND = 1;		// need to send IKCP_CMD_WASK
 const IUINT32 IKCP_ASK_TELL = 2;		// need to send IKCP_CMD_WINS
 const IUINT32 IKCP_WND_SND = 32;
-const IUINT32 IKCP_WND_RCV = 128;       // must >= max fragment size
+const IUINT32 IKCP_WND_RCV = 256;       // must >= max fragment size
 const IUINT32 IKCP_MTU_DEF = 1400;
 const IUINT32 IKCP_ACK_FAST	= 3;
 const IUINT32 IKCP_INTERVAL	= 100;
-const IUINT32 IKCP_OVERHEAD = 24;
+const IUINT32 IKCP_OVERHEAD = 28;
 const IUINT32 IKCP_DEADLINK = 20;
 const IUINT32 IKCP_THRESH_INIT = 2;
 const IUINT32 IKCP_THRESH_MIN = 2;
@@ -231,11 +231,12 @@ void ikcp_qprint(const char *name, const struct IQUEUEHEAD *head)
 //---------------------------------------------------------------------
 // create a new kcpcb
 //---------------------------------------------------------------------
-ikcpcb* ikcp_create(IUINT32 conv, void *user)
+ikcpcb* ikcp_create(IUINT32 conv, IUINT32 token, void *user)
 {
 	ikcpcb *kcp = (ikcpcb*)ikcp_malloc(sizeof(struct IKCPCB));
 	if (kcp == NULL) return NULL;
 	kcp->conv = conv;
+	kcp->token = token;
 	kcp->user = user;
 	kcp->snd_una = 0;
 	kcp->snd_nxt = 0;
@@ -759,7 +760,7 @@ int ikcp_input(ikcpcb *kcp, const char *data, long size)
 	if (data == NULL || (int)size < (int)IKCP_OVERHEAD) return -1;
 
 	while (1) {
-		IUINT32 ts, sn, len, una, conv;
+		IUINT32 ts, sn, len, una, conv, token;
 		IUINT16 wnd;
 		IUINT8 cmd, frg;
 		IKCPSEG *seg;
@@ -769,6 +770,7 @@ int ikcp_input(ikcpcb *kcp, const char *data, long size)
 		data = ikcp_decode32u(data, &conv);
 		if (conv != kcp->conv) return -1;
 
+		data = ikcp_decode32u(data, &token);
 		data = ikcp_decode8u(data, &cmd);
 		data = ikcp_decode8u(data, &frg);
 		data = ikcp_decode16u(data, &wnd);
@@ -784,6 +786,8 @@ int ikcp_input(ikcpcb *kcp, const char *data, long size)
 		if (cmd != IKCP_CMD_PUSH && cmd != IKCP_CMD_ACK &&
 			cmd != IKCP_CMD_WASK && cmd != IKCP_CMD_WINS) 
 			return -3;
+
+		if (token != kcp->token) return -1;
 
 		kcp->rmt_wnd = wnd;
 		ikcp_parse_una(kcp, una);
@@ -829,6 +833,7 @@ int ikcp_input(ikcpcb *kcp, const char *data, long size)
 				if (_itimediff(sn, kcp->rcv_nxt) >= 0) {
 					seg = ikcp_segment_new(kcp, len);
 					seg->conv = conv;
+					seg->token = token;
 					seg->cmd = cmd;
 					seg->frg = frg;
 					seg->wnd = wnd;
@@ -906,6 +911,7 @@ int ikcp_input(ikcpcb *kcp, const char *data, long size)
 static char *ikcp_encode_seg(char *ptr, const IKCPSEG *seg)
 {
 	ptr = ikcp_encode32u(ptr, seg->conv);
+	ptr = ikcp_encode32u(ptr, seg->token);
 	ptr = ikcp_encode8u(ptr, (IUINT8)seg->cmd);
 	ptr = ikcp_encode8u(ptr, (IUINT8)seg->frg);
 	ptr = ikcp_encode16u(ptr, (IUINT16)seg->wnd);
@@ -1030,6 +1036,7 @@ void ikcp_flush(ikcpcb *kcp)
 		kcp->nsnd_buf++;
 
 		newseg->conv = kcp->conv;
+		newseg->token = kcp->token;
 		newseg->cmd = IKCP_CMD_PUSH;
 		newseg->wnd = seg.wnd;
 		newseg->ts = current;

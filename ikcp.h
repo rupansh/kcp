@@ -268,6 +268,7 @@ struct IKCPSEG
 {
 	struct IQUEUEHEAD node;
 	IUINT32 conv;
+	IUINT32 token;
 	IUINT32 cmd;
 	IUINT32 frg;
 	IUINT32 wnd;
@@ -288,7 +289,7 @@ struct IKCPSEG
 //---------------------------------------------------------------------
 struct IKCPCB
 {
-	IUINT32 conv, mtu, mss, state;
+	IUINT32 conv, mtu, mss, state, token;
 	IUINT32 snd_una, snd_nxt, rcv_nxt;
 	IUINT32 ts_recent, ts_lastack, ssthresh;
 	IINT32 rx_rttval, rx_srtt, rx_rto, rx_minrto;
@@ -343,7 +344,7 @@ extern "C" {
 // create a new kcp control object, 'conv' must equal in two endpoint
 // from the same connection. 'user' will be passed to the output callback
 // output callback can be setup like this: 'kcp->output = my_udp_output'
-ikcpcb* ikcp_create(IUINT32 conv, void *user);
+ikcpcb* ikcp_create(IUINT32 conv, IUINT32 token, void *user);
 
 // release kcp control object
 void ikcp_release(ikcpcb *kcp);

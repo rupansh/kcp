@@ -34,8 +34,8 @@ void test(int mode)
 
 	// 创建两个端点的 kcp对象，第一个参数 conv是会话编号，同一个会话需要相同
 	// 最后一个是 user参数，用来传递标识
-	ikcpcb *kcp1 = ikcp_create(0x11223344, (void*)0);
-	ikcpcb *kcp2 = ikcp_create(0x11223344, (void*)1);
+	ikcpcb *kcp1 = ikcp_create(0x11223344, 0, (void*)0);
+	ikcpcb *kcp2 = ikcp_create(0x11223344, 0, (void*)1);
 
 	// 设置kcp的下层输出，这里为 udp_output，模拟udp网络输出函数
 	kcp1->output = udp_output;
